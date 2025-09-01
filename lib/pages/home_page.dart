@@ -3,6 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lumeno_app/pages/profile_page.dart';
+import 'package:lumeno_app/pages/product_detail_page.dart';
+import 'package:lumeno_app/pages/cart_page.dart'; // Add this line
+import 'package:lumeno_app/pages/order_history_page.dart'; // Add this line
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -16,12 +20,55 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text("LUMENO"),
-        backgroundColor: Colors.green.shade800,
-        actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
-          IconButton(onPressed: signOut, icon: const Icon(Icons.logout)),
-        ],
+  title: const Text("LUMENO"),
+  backgroundColor: Colors.green.shade800,
+  actions: [
+    IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
+    // NEW: Add this IconButton for the cart
+    IconButton(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const CartPage()),
+        );
+      },
+      icon: const Icon(Icons.shopping_cart_outlined),
+    ),
+    IconButton(onPressed: signOut, icon: const Icon(Icons.logout)),
+  ],
+),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(255, 23, 36, 24),
+              ),
+              child: const Text(
+                'LUMENO MENU',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                ),
+              ),
+            ),
+            
+            ListTile(
+  leading: const Icon(Icons.history),
+  title: const Text('ORDER HISTORY'),
+  onTap: () {
+    // Close the drawer first
+    Navigator.pop(context);
+    // NEW: Navigate to the Order History Page
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const OrderHistoryPage()),
+    );
+  },
+),
+          ],
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -83,7 +130,6 @@ class HomePage extends StatelessWidget {
 
             // THE CORRECTED 4x2 GRID
             StreamBuilder<QuerySnapshot>(
-              // We limit to 8 to ensure a 4x2 grid
               stream: FirebaseFirestore.instance
                   .collection('products')
                   .limit(8)
@@ -109,9 +155,13 @@ class HomePage extends StatelessWidget {
                   ),
                   itemCount: products.length,
                   itemBuilder: (context, index) {
-                    final product =
+                    final productData =
                         products[index].data() as Map<String, dynamic>;
-                    return ProductCard(product: product);
+                    // **CHANGE 1 of 2**: Get the document ID
+                    final productId = products[index].id;
+                    
+                    // **CHANGE 2 of 2**: Pass the ID to the ProductCard
+                    return ProductCard(product: productData, productId: productId);
                   },
                 );
               },
@@ -156,8 +206,14 @@ class CategoryIcon extends StatelessWidget {
 // Redesigned, larger Product Card
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
+  // **CHANGE 1 of 2**: Add productId field
+  final String productId;
 
-  const ProductCard({super.key, required this.product});
+  const ProductCard({
+    super.key,
+    required this.product,
+    required this.productId, // Require the ID
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -167,107 +223,121 @@ class ProductCard extends StatelessWidget {
     final num price = product['price'] ?? 0;
     final double rating = (product['rating'] ?? 4.5).toDouble();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 2,
-            blurRadius: 5,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(15.0)),
-                    image: DecorationImage(
-                      image: NetworkImage(imageUrl),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.white,
-                    radius: 15,
-                    child: IconButton(
-                      iconSize: 15,
-                      icon:
-                          const Icon(Icons.favorite_border, color: Colors.grey),
-                      onPressed: () {},
-                    ),
-                  ),
-                ),
-              ],
+    // **CHANGE 2 of 2**: Wrap the card in a GestureDetector
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailPage(
+              product: product,
+              productId: productId,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.star, color: Colors.amber, size: 16),
-                    const SizedBox(width: 2),
-                    Text(rating.toString()),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  name,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'By $seller',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '₹${price.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 2,
+              blurRadius: 5,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(15.0)),
+                      image: DecorationImage(
+                        image: NetworkImage(imageUrl),
+                        fit: BoxFit.cover,
                       ),
                     ),
-                    ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            const Color.fromARGB(255, 236, 230, 230),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.white,
+                      radius: 15,
+                      child: IconButton(
+                        iconSize: 15,
+                        icon:
+                            const Icon(Icons.favorite_border, color: Colors.grey),
+                        onPressed: () {},
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 16),
+                      const SizedBox(width: 2),
+                      Text(rating.toString()),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    name,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'By $seller',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '₹${price.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
                       ),
-                      child: const Text('ADD', style: TextStyle(fontSize: 14)),
-                    ),
-                  ],
-                ),
-              ],
+                      ElevatedButton(
+                        onPressed: () {},
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              const Color.fromARGB(255, 236, 230, 230),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        child: const Text('ADD', style: TextStyle(fontSize: 14)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

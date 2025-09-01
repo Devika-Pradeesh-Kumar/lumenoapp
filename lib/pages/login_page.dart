@@ -14,7 +14,39 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  // NEW: State variable to toggle password visibility
+  bool _isPasswordObscured = true;
 
+  // Function to handle password reset
+  Future<void> forgotPassword() async {
+    // Show a loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _emailController.text.trim(),
+      );
+      // Close the loading dialog
+      Navigator.pop(context);
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset link sent! Check your email.')),
+      );
+    } on FirebaseAuthException catch (e) {
+      // Close the loading dialog
+      Navigator.pop(context);
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? "An error occurred")),
+      );
+    }
+  }
+
+  // --- Login and Sign Up functions remain the same ---
   Future<void> signUp() async {
     setState(() { _isLoading = true; });
     try {
@@ -22,7 +54,6 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      // THIS IS THE FIX: Close the login page on success
       if (mounted) Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       if (mounted) {
@@ -41,7 +72,6 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      // THIS IS THE FIX: Close the login page on success
       if (mounted) Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       if (mounted) {
@@ -58,6 +88,7 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       body: Stack(
         children: [
+          // Background Gradient
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -67,6 +98,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
+          // Login Form
           Center(
             child: SingleChildScrollView(
               child: Container(
@@ -100,12 +132,25 @@ class _LoginPageState extends State<LoginPage> {
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 20),
+                    // NEW: Updated Password Field
                     TextField(
                       controller: _passwordController,
-                      obscureText: true,
+                      obscureText: _isPasswordObscured, // Use the state variable
                       decoration: InputDecoration(
                         hintText: 'Password',
                         prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
+                        // This is the show/hide password icon
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _isPasswordObscured ? Icons.visibility_off : Icons.visibility,
+                            color: Colors.white70,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isPasswordObscured = !_isPasswordObscured;
+                            });
+                          },
+                        ),
                         filled: true,
                         fillColor: Colors.black.withOpacity(0.1),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
@@ -113,7 +158,23 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       style: const TextStyle(color: Colors.white),
                     ),
-                    const SizedBox(height: 30),
+                    // NEW: Forgot Password Text
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0, right: 12.0),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: forgotPassword,
+                          child: const Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                     _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
                         : Column(

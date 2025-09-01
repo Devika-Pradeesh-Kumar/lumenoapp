@@ -85,7 +85,7 @@ class _WelcomePageState extends State<WelcomePage> {
                       'EMPOWERING LOCAL ENTREPRENEURS AND CONNECTING COMMUNITIES.',
                       style: TextStyle(
                         fontSize: 16, // Adjusted font size
-                        color: Colors.white70,
+                        color: Color.fromARGB(179, 242, 242, 242),
                       ),
                       textAlign: TextAlign.center,
                     ),
