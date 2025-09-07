@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Make sure this is imported
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -14,46 +15,50 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  // NEW: State variable to toggle password visibility
   bool _isPasswordObscured = true;
 
-  // Function to handle password reset
+  // Forgot Password function (no changes needed here)
   Future<void> forgotPassword() async {
-    // Show a loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
-
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(
         email: _emailController.text.trim(),
       );
-      // Close the loading dialog
       Navigator.pop(context);
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password reset link sent! Check your email.')),
       );
     } on FirebaseAuthException catch (e) {
-      // Close the loading dialog
       Navigator.pop(context);
-      // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? "An error occurred")),
       );
     }
   }
 
-  // --- Login and Sign Up functions remain the same ---
+  // UPDATED Sign Up function with Firestore document creation
   Future<void> signUp() async {
     setState(() { _isLoading = true; });
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      // 1. Create the user in Firebase Auth
+      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      // 2. Create a user document in Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set({
+            'email': _emailController.text.trim(),
+            'isSeller': false, // Set default role
+          });
+
       if (mounted) Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       if (mounted) {
@@ -65,6 +70,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() { _isLoading = false; });
   }
 
+  // Login function (no changes needed here)
   Future<void> login() async {
     setState(() { _isLoading = true; });
     try {
@@ -132,14 +138,12 @@ class _LoginPageState extends State<LoginPage> {
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 20),
-                    // NEW: Updated Password Field
                     TextField(
                       controller: _passwordController,
-                      obscureText: _isPasswordObscured, // Use the state variable
+                      obscureText: _isPasswordObscured,
                       decoration: InputDecoration(
                         hintText: 'Password',
                         prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
-                        // This is the show/hide password icon
                         suffixIcon: IconButton(
                           icon: Icon(
                             _isPasswordObscured ? Icons.visibility_off : Icons.visibility,
@@ -158,7 +162,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       style: const TextStyle(color: Colors.white),
                     ),
-                    // NEW: Forgot Password Text
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0, right: 12.0),
                       child: Align(
@@ -169,6 +172,7 @@ class _LoginPageState extends State<LoginPage> {
                             'Forgot Password?',
                             style: TextStyle(
                               color: Colors.white70,
+                              decoration: TextDecoration.underline,
                             ),
                           ),
                         ),

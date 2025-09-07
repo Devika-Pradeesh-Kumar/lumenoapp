@@ -5,8 +5,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lumeno_app/pages/profile_page.dart';
 import 'package:lumeno_app/pages/product_detail_page.dart';
-import 'package:lumeno_app/pages/cart_page.dart'; // Add this line
-import 'package:lumeno_app/pages/order_history_page.dart'; // Add this line
+import 'package:lumeno_app/pages/cart_page.dart';
+import 'package:lumeno_app/pages/order_history_page.dart';
+import 'package:lumeno_app/pages/become_seller_page.dart';
+import 'package:lumeno_app/pages/seller_dashboard_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -17,26 +19,29 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get the current user to listen to their document
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-  title: const Text("LUMENO"),
-  backgroundColor: Colors.green.shade800,
-  actions: [
-    IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
-    // NEW: Add this IconButton for the cart
-    IconButton(
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const CartPage()),
-        );
-      },
-      icon: const Icon(Icons.shopping_cart_outlined),
-    ),
-    IconButton(onPressed: signOut, icon: const Icon(Icons.logout)),
-  ],
-),
+        title: const Text("LUMENO"),
+        backgroundColor: Colors.green.shade800,
+        actions: [
+          IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CartPage()),
+              );
+            },
+            icon: const Icon(Icons.shopping_cart_outlined),
+          ),
+          IconButton(onPressed: signOut, icon: const Icon(Icons.logout)),
+        ],
+      ),
+      // THIS DRAWER IS NOW BUILT WITH A STREAMBUILDER FOR REAL-TIME UPDATES
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -53,28 +58,69 @@ class HomePage extends StatelessWidget {
                 ),
               ),
             ),
-            
             ListTile(
-  leading: const Icon(Icons.history),
-  title: const Text('ORDER HISTORY'),
-  onTap: () {
-    // Close the drawer first
-    Navigator.pop(context);
-    // NEW: Navigate to the Order History Page
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const OrderHistoryPage()),
-    );
-  },
-),
+              leading: const Icon(Icons.person_outline),
+              title: const Text('MY PROFILE'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.history),
+              title: const Text('ORDER HISTORY'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const OrderHistoryPage()),
+                );
+              },
+            ),
+            const Divider(),
+            // THIS STREAMBUILDER LISTENS FOR LIVE CHANGES TO THE USER'S ROLE
+            StreamBuilder<DocumentSnapshot>(
+              // We listen to the specific user's document in the 'users' collection
+              stream: user != null
+                  ? FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots()
+                  : null,
+              builder: (context, snapshot) {
+                // Check if the user document exists and if 'isSeller' is true
+                if (snapshot.hasData && snapshot.data!.exists && (snapshot.data!.data() as Map<String, dynamic>)['isSeller'] == true) {
+                  // If they ARE a seller, show the Seller Dashboard link
+                  return ListTile(
+                    leading: const Icon(Icons.dashboard_customize_outlined),
+                    title: const Text('Seller Dashboard'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const SellerDashboardPage()));
+                    },
+                  );
+                }
+                // Otherwise (or if data is loading), show the Become a Seller link
+                else {
+                  return ListTile(
+                    leading: const Icon(Icons.storefront),
+                    title: const Text('Become a Seller'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const BecomeSellerPage()));
+                    },
+                  );
+                }
+              },
+            ),
           ],
         ),
       ),
+      // YOUR BODY LAYOUT REMAINS UNCHANGED
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Promotional Banner
             Container(
               margin: const EdgeInsets.all(16.0),
               height: 320,
@@ -86,8 +132,6 @@ class HomePage extends StatelessWidget {
                 ),
               ),
             ),
-
-            // "Shop by Category" Section
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
@@ -111,8 +155,6 @@ class HomePage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-
-            // "Trending Products" Section Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
@@ -127,8 +169,6 @@ class HomePage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-
-            // THE CORRECTED 4x2 GRID
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('products')
@@ -142,25 +182,21 @@ class HomePage extends StatelessWidget {
                   return const Center(child: Text('No products found.'));
                 }
                 final products = snapshot.data!.docs;
-
                 return GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4, // 4 items per row
+                    crossAxisCount: 4,
                     crossAxisSpacing: 16.0,
                     mainAxisSpacing: 16.0,
-                    childAspectRatio: 1.2, // Taller cards to fill space
+                    childAspectRatio: 1.2,
                   ),
                   itemCount: products.length,
                   itemBuilder: (context, index) {
                     final productData =
                         products[index].data() as Map<String, dynamic>;
-                    // **CHANGE 1 of 2**: Get the document ID
                     final productId = products[index].id;
-                    
-                    // **CHANGE 2 of 2**: Pass the ID to the ProductCard
                     return ProductCard(product: productData, productId: productId);
                   },
                 );
@@ -179,7 +215,6 @@ class CategoryIcon extends StatelessWidget {
   final IconData icon;
   final String label;
   const CategoryIcon({super.key, required this.icon, required this.label});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -203,18 +238,15 @@ class CategoryIcon extends StatelessWidget {
   }
 }
 
-// Redesigned, larger Product Card
+// Product Card Widget
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
-  // **CHANGE 1 of 2**: Add productId field
   final String productId;
-
   const ProductCard({
     super.key,
     required this.product,
-    required this.productId, // Require the ID
+    required this.productId,
   });
-
   @override
   Widget build(BuildContext context) {
     final String imageUrl = product['imageUrl'] ?? '';
@@ -222,8 +254,6 @@ class ProductCard extends StatelessWidget {
     final String seller = product['seller'] ?? 'Local Artisan';
     final num price = product['price'] ?? 0;
     final double rating = (product['rating'] ?? 4.5).toDouble();
-
-    // **CHANGE 2 of 2**: Wrap the card in a GestureDetector
     return GestureDetector(
       onTap: () {
         Navigator.push(
