@@ -1,11 +1,8 @@
 // lib/pages/add_product_page.dart
 
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AddProductPage extends StatefulWidget {
   const AddProductPage({super.key});
@@ -15,154 +12,92 @@ class AddProductPage extends StatefulWidget {
 }
 
 class _AddProductPageState extends State<AddProductPage> {
+  // 🔹 Controllers for form fields
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController priceController = TextEditingController();
+  final TextEditingController descriptionController = TextEditingController();
+  final TextEditingController imageUrlController = TextEditingController();
+
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _priceController = TextEditingController();
+  bool isLoading = false;
 
-  File? _imageFile;
-  bool _isLoading = false;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    _priceController.dispose();
-    super.dispose();
-  }
-
-  // Function to pick an image from the gallery
-  Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
-    }
-  }
-
-  // Function to upload the image and save the product
+  // 🔹 Save product to Firestore
   Future<void> _saveProduct() async {
-    if (!_formKey.currentState!.validate() || _imageFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields and select an image.')),
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() { _isLoading = true; });
+    setState(() {
+      isLoading = true;
+    });
 
     try {
-      final user = FirebaseAuth.instance.currentUser!;
-      final fileName = DateTime.now().millisecondsSinceEpoch.toString();
-      final storageRef = FirebaseStorage.instance.ref().child('product_images/$fileName');
-
-      // 1. Upload the image to Firebase Storage
-      await storageRef.putFile(_imageFile!);
-      final imageUrl = await storageRef.getDownloadURL();
-
-      // 2. Save the product data to Firestore
       await FirebaseFirestore.instance.collection('products').add({
-        'name': _nameController.text.trim(),
-        'description': _descriptionController.text.trim(),
-        'price': double.parse(_priceController.text.trim()),
-        'imageUrl': imageUrl,
-        'sellerId': user.uid, // Link the product to the seller
-        'seller': user.email, // Optionally, store seller's email
-        'rating': 4.5, // Default rating
+        'name': nameController.text,
+        'price': double.tryParse(priceController.text) ?? 0,
+        'description': descriptionController.text,
+        'imageUrl': imageUrlController.text,
+        'seller': FirebaseAuth.instance.currentUser?.uid ?? "unknown",
+        'searchName': nameController.text.toLowerCase(), // ✅ lowercase for search
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Product added successfully!')),
-        );
-        Navigator.pop(context); // Go back to the dashboard
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Product added successfully")),
+      );
 
+      // Clear fields
+      nameController.clear();
+      priceController.clear();
+      descriptionController.clear();
+      imageUrlController.clear();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add product: $e')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
     } finally {
-      if (mounted) {
-        setState(() { _isLoading = false; });
-      }
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add New Product'),
-        backgroundColor: Colors.green.shade800,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+      appBar: AppBar(title: const Text("Add Product")),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: ListView(
             children: [
-              // Image Picker
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: Colors.grey.shade400),
-                  ),
-                  child: _imageFile != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
-                          child: Image.file(_imageFile!, fit: BoxFit.cover),
-                        )
-                      : const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_a_photo_outlined, size: 50, color: Colors.grey),
-                              SizedBox(height: 8),
-                              Text('Tap to select an image', style: TextStyle(color: Colors.grey)),
-                            ],
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 24),
               TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Product Name', border: OutlineInputBorder()),
-                validator: (value) => value!.isEmpty ? 'Please enter a name' : null,
+                controller: nameController,
+                decoration: const InputDecoration(labelText: "Product Name"),
+                validator: (value) =>
+                    value!.isEmpty ? "Enter product name" : null,
               ),
-              const SizedBox(height: 16),
               TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
-                maxLines: 3,
-                validator: (value) => value!.isEmpty ? 'Please enter a description' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _priceController,
-                decoration: const InputDecoration(labelText: 'Price', border: OutlineInputBorder(), prefixText: '₹'),
+                controller: priceController,
+                decoration: const InputDecoration(labelText: "Price"),
                 keyboardType: TextInputType.number,
-                validator: (value) => value!.isEmpty ? 'Please enter a price' : null,
+                validator: (value) =>
+                    value!.isEmpty ? "Enter product price" : null,
               ),
-              const SizedBox(height: 32),
+              TextFormField(
+                controller: descriptionController,
+                decoration: const InputDecoration(labelText: "Description"),
+                maxLines: 3,
+              ),
+              TextFormField(
+                controller: imageUrlController,
+                decoration: const InputDecoration(labelText: "Image URL"),
+              ),
+              const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _isLoading ? null : _saveProduct,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
+                onPressed: isLoading ? null : _saveProduct,
+                child: isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Save Product', style: TextStyle(fontSize: 18)),
+                    : const Text("Add Product"),
               ),
             ],
           ),

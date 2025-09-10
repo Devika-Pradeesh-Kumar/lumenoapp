@@ -9,6 +9,9 @@ import 'package:lumeno_app/pages/cart_page.dart';
 import 'package:lumeno_app/pages/order_history_page.dart';
 import 'package:lumeno_app/pages/become_seller_page.dart';
 import 'package:lumeno_app/pages/seller_dashboard_page.dart';
+import 'package:lumeno_app/pages/search_page.dart'; 
+import 'package:lumeno_app/pages/hamper_page.dart'; // ✅ new import
+
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -19,16 +22,24 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Get the current user to listen to their document
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text("LUMENO"),
-        backgroundColor: Colors.green.shade800,
+        backgroundColor: Colors.green.shade200,
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
+          // ✅ SEARCH BUTTON FIX
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SearchPage()),
+              );
+            },
+            icon: const Icon(Icons.search),
+          ),
           IconButton(
             onPressed: () {
               Navigator.push(
@@ -41,21 +52,19 @@ class HomePage extends StatelessWidget {
           IconButton(onPressed: signOut, icon: const Icon(Icons.logout)),
         ],
       ),
-      // THIS DRAWER IS NOW BUILT WITH A STREAMBUILDER FOR REAL-TIME UPDATES
+
+      // ✅ Drawer remains same
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
             DrawerHeader(
-              decoration: BoxDecoration(
-                color: const Color.fromARGB(255, 23, 36, 24),
+              decoration: const BoxDecoration(
+                color: Color.fromARGB(255, 23, 36, 24),
               ),
               child: const Text(
                 'LUMENO MENU',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 24),
               ),
             ),
             ListTile(
@@ -76,38 +85,48 @@ class HomePage extends StatelessWidget {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const OrderHistoryPage()),
+                  MaterialPageRoute(
+                      builder: (context) => const OrderHistoryPage()),
                 );
               },
             ),
             const Divider(),
-            // THIS STREAMBUILDER LISTENS FOR LIVE CHANGES TO THE USER'S ROLE
             StreamBuilder<DocumentSnapshot>(
-              // We listen to the specific user's document in the 'users' collection
               stream: user != null
-                  ? FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots()
+                  ? FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .snapshots()
                   : null,
               builder: (context, snapshot) {
-                // Check if the user document exists and if 'isSeller' is true
-                if (snapshot.hasData && snapshot.data!.exists && (snapshot.data!.data() as Map<String, dynamic>)['isSeller'] == true) {
-                  // If they ARE a seller, show the Seller Dashboard link
+                if (snapshot.hasData &&
+                    snapshot.data!.exists &&
+                    (snapshot.data!.data()
+                            as Map<String, dynamic>)['isSeller'] ==
+                        true) {
                   return ListTile(
                     leading: const Icon(Icons.dashboard_customize_outlined),
                     title: const Text('Seller Dashboard'),
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const SellerDashboardPage()));
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const SellerDashboardPage()));
                     },
                   );
-                }
-                // Otherwise (or if data is loading), show the Become a Seller link
-                else {
+                } else {
                   return ListTile(
                     leading: const Icon(Icons.storefront),
                     title: const Text('Become a Seller'),
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const BecomeSellerPage()));
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const BecomeSellerPage()));
                     },
                   );
                 }
@@ -116,7 +135,8 @@ class HomePage extends StatelessWidget {
           ],
         ),
       ),
-      // YOUR BODY LAYOUT REMAINS UNCHANGED
+
+      // ✅ Body remains same, trending products updated
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -141,19 +161,27 @@ class HomePage extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 100,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                children: const [
-                  CategoryIcon(icon: Icons.brush, label: 'Handicrafts'),
-                  CategoryIcon(icon: Icons.checkroom, label: 'Clothing'),
-                  CategoryIcon(icon: Icons.eco, label: 'Organic'),
-                  CategoryIcon(
-                      icon: Icons.miscellaneous_services, label: 'Services'),
-                ],
-              ),
-            ),
+  height: 100,
+  child: ListView(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+    children: [
+      GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const HamperPage()),
+          );
+        },
+        child: const CategoryIcon(icon: Icons.card_giftcard, label: 'Hamper'),
+      ),
+      const CategoryIcon(icon: Icons.brush, label: 'Handicrafts'),
+      const CategoryIcon(icon: Icons.checkroom, label: 'Clothing'),
+      const CategoryIcon(icon: Icons.eco, label: 'Organic'),
+      const CategoryIcon(icon: Icons.miscellaneous_services, label: 'Services'),
+    ],
+  ),
+),
             const SizedBox(height: 24),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -197,7 +225,8 @@ class HomePage extends StatelessWidget {
                     final productData =
                         products[index].data() as Map<String, dynamic>;
                     final productId = products[index].id;
-                    return ProductCard(product: productData, productId: productId);
+                    return ProductCard(
+                        product: productData, productId: productId);
                   },
                 );
               },
@@ -210,7 +239,7 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// Category Icon Widget
+// ✅ Category Icon
 class CategoryIcon extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -238,7 +267,7 @@ class CategoryIcon extends StatelessWidget {
   }
 }
 
-// Product Card Widget
+// ✅ Product Card with Firestore Add-to-Cart
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   final String productId;
@@ -259,10 +288,8 @@ class ProductCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductDetailPage(
-              product: product,
-              productId: productId,
-            ),
+            builder: (context) =>
+                ProductDetailPage(product: product, productId: productId),
           ),
         );
       },
@@ -286,8 +313,8 @@ class ProductCard extends StatelessWidget {
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(15.0)),
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(15.0)),
                       image: DecorationImage(
                         image: NetworkImage(imageUrl),
                         fit: BoxFit.cover,
@@ -302,8 +329,8 @@ class ProductCard extends StatelessWidget {
                       radius: 15,
                       child: IconButton(
                         iconSize: 15,
-                        icon:
-                            const Icon(Icons.favorite_border, color: Colors.grey),
+                        icon: const Icon(Icons.favorite_border,
+                            color: Colors.grey),
                         onPressed: () {},
                       ),
                     ),
@@ -350,16 +377,38 @@ class ProductCard extends StatelessWidget {
                         ),
                       ),
                       ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () async {
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user != null) {
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(user.uid)
+                                .collection('cart')
+                                .doc(productId)
+                                .set({
+                              'name': name,
+                              'price': price,
+                              'imageUrl': imageUrl,
+                              'quantity': 1,
+                            }, SetOptions(merge: true));
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Added to cart')),
+                            );
+                          }
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
                               const Color.fromARGB(255, 236, 230, 230),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 12),
                         ),
-                        child: const Text('ADD', style: TextStyle(fontSize: 14)),
+                        child:
+                            const Text('ADD', style: TextStyle(fontSize: 14)),
                       ),
                     ],
                   ),
