@@ -12,37 +12,30 @@ class HamperPage extends StatelessWidget {
     {
       'name': 'Chocolate Hamper',
       'price': 499,
-      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/your-project-id.appspot.com/o/chocolate_hamper.jpg?alt=media',
+      'imageUrl': 'https://ik.imagekit.io/v7vzhm85m/chocolate%20hamper.jpg?updatedAt=1757568065067',
       'seller': 'Local Artisan',
       'rating': 4.5,
     },
     {
       'name': 'Fruit Hamper',
       'price': 599,
-      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/your-project-id.appspot.com/o/fruit_hamper.jpg?alt=media',
+      'imageUrl': 'https://ik.imagekit.io/v7vzhm85m/fruit%20hamper.jpg',
       'seller': 'Local Artisan',
       'rating': 4.5,
     },
     {
       'name': 'Car Bouquet',
       'price': 799,
-      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/your-project-id.appspot.com/o/car_bouquet.jpg?alt=media',
+      'imageUrl': 'https://ik.imagekit.io/v7vzhm85m/hot%20wheels%20bouquet%20ramo%20de%20carros%20ramo%20para%20el%20bouquets%20for%20him.jpg',
       'seller': 'Local Artisan',
       'rating': 4.5,
     },
     {
       'name': 'Customizable Hamper',
       'price': 699,
-      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/your-project-id.appspot.com/o/customizable_hamper.jpg?alt=media',
+      'imageUrl': 'https://ik.imagekit.io/v7vzhm85m/custom.jpg',
       'seller': 'Local Artisan',
       'rating': 4.5,
-    },
-    {
-      'name': 'Luxury Hamper',
-      'price': 999,
-      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/your-project-id.appspot.com/o/luxury_hamper.jpg?alt=media',
-      'seller': 'Local Artisan',
-      'rating': 4.8,
     },
   ];
 
