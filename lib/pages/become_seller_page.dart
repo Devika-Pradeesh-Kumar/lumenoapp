@@ -1,65 +1,99 @@
 // lib/pages/become_seller_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class BecomeSellerPage extends StatelessWidget {
+class BecomeSellerPage extends StatefulWidget {
   const BecomeSellerPage({super.key});
 
-  Future<void> upgradeToSeller(BuildContext context) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  @override
+  State<BecomeSellerPage> createState() => _BecomeSellerPageState();
+}
 
-    // Find the user's document and update the isSeller field to true
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .update({'isSeller': true});
+class _BecomeSellerPageState extends State<BecomeSellerPage> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _shopNameController = TextEditingController();
+  final TextEditingController _categoryController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
 
-    // Show a success message and go back
-    if (context.mounted) {
+  bool _loading = false;
+
+  Future<void> _submitSellerApplication() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _loading = true);
+
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception("User not logged in");
+
+      await FirebaseFirestore.instance.collection("sellers").doc(user.uid).set({
+        "shopName": _shopNameController.text,
+        "category": _categoryController.text,
+        "description": _descriptionController.text,
+        "phone": _phoneController.text,
+        "verified": false,
+        "createdAt": FieldValue.serverTimestamp(),
+      });
+
+      // Also update user profile with seller flag
+      await FirebaseFirestore.instance.collection("users").doc(user.uid).update({
+        "isSeller": true,
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Congratulations! You are now a seller.')),
+        const SnackBar(content: Text("Application submitted successfully!")),
       );
+
       Navigator.pop(context);
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    } finally {
+      setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Become a Seller'),
-        backgroundColor: Colors.green.shade800,
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      appBar: AppBar(title: const Text("Become a Seller")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: ListView(
             children: [
-              const Icon(Icons.storefront_outlined, size: 80, color: Colors.green),
+              TextFormField(
+                controller: _shopNameController,
+                decoration: const InputDecoration(labelText: "Shop Name"),
+                validator: (v) => v!.isEmpty ? "Enter shop name" : null,
+              ),
+              TextFormField(
+                controller: _categoryController,
+                decoration: const InputDecoration(labelText: "Category"),
+                validator: (v) => v!.isEmpty ? "Enter category" : null,
+              ),
+              TextFormField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(labelText: "Description"),
+                maxLines: 3,
+              ),
+              TextFormField(
+                controller: _phoneController,
+                decoration: const InputDecoration(labelText: "Phone"),
+                keyboardType: TextInputType.phone,
+              ),
               const SizedBox(height: 20),
-              const Text(
-                'Join Our Community of Sellers',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Start selling your unique products and services to a wider audience. Upgrade your account to get started.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-              const SizedBox(height: 40),
               ElevatedButton(
-                onPressed: () => upgradeToSeller(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                ),
-                child: const Text('Upgrade to a Seller Account', style: TextStyle(fontSize: 16)),
+                onPressed: _loading ? null : _submitSellerApplication,
+                child: _loading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text("Submit Application"),
               ),
             ],
           ),

@@ -2,7 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Make sure this is imported
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lumeno_app/pages/home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,76 +18,65 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   bool _isPasswordObscured = true;
 
-  // Forgot Password function (no changes needed here)
+  // Forgot Password
   Future<void> forgotPassword() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(
         email: _emailController.text.trim(),
       );
-      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password reset link sent! Check your email.')),
       );
     } on FirebaseAuthException catch (e) {
-      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? "An error occurred")),
       );
     }
   }
 
-  // UPDATED Sign Up function with Firestore document creation
+  // Sign Up
   Future<void> signUp() async {
-    setState(() { _isLoading = true; });
+    setState(() => _isLoading = true);
     try {
-      // 1. Create the user in Firebase Auth
       UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // 2. Create a user document in Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .set({
-            'email': _emailController.text.trim(),
-            'isSeller': false, // Set default role
-          });
+      // Create user doc in Firestore
+      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+        'email': _emailController.text.trim(),
+        'isSeller': false,
+      });
 
-      if (mounted) Navigator.pop(context);
-    } on FirebaseAuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? "An error occurred")),
-        );
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage()));
       }
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? "An error occurred")),
+      );
     }
-    setState(() { _isLoading = false; });
+    setState(() => _isLoading = false);
   }
 
-  // Login function (no changes needed here)
+  // User Login
   Future<void> login() async {
-    setState(() { _isLoading = true; });
+    setState(() => _isLoading = true);
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      if (mounted) Navigator.pop(context);
-    } on FirebaseAuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? "An error occurred")),
-        );
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage()));
       }
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? "An error occurred")),
+      );
     }
-    setState(() { _isLoading = false; });
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -120,9 +110,15 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const Icon(Icons.eco_outlined, size: 60, color: Colors.white),
                     const SizedBox(height: 16),
-                    const Text('Welcome!', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const Text(
+                      'Welcome!',
+                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
                     const SizedBox(height: 8),
-                    const Text('Create an account or sign in', style: TextStyle(fontSize: 16, color: Colors.white70)),
+                    const Text(
+                      'Login as User',
+                      style: TextStyle(fontSize: 16, color: Colors.white70),
+                    ),
                     const SizedBox(height: 32),
                     TextField(
                       controller: _emailController,
@@ -210,14 +206,6 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            top: 40,
-            left: 10,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
             ),
           ),
         ],

@@ -1,8 +1,12 @@
 // lib/pages/add_product_page.dart
 
+// lib/pages/add_product_page.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 class AddProductPage extends StatefulWidget {
   const AddProductPage({super.key});
@@ -12,97 +16,111 @@ class AddProductPage extends StatefulWidget {
 }
 
 class _AddProductPageState extends State<AddProductPage> {
-  // 🔹 Controllers for form fields
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController priceController = TextEditingController();
-  final TextEditingController descriptionController = TextEditingController();
-  final TextEditingController imageUrlController = TextEditingController();
-
   final _formKey = GlobalKey<FormState>();
-  bool isLoading = false;
+  String _name = "";
+  String _description = "";
+  double _price = 0;
+  File? _imageFile;
+  bool _loading = false;
 
-  // 🔹 Save product to Firestore
+  Future<void> _pickImage() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() {
+        _imageFile = File(picked.path);
+      });
+    }
+  }
+
   Future<void> _saveProduct() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _imageFile == null) return;
+    _formKey.currentState!.save();
 
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => _loading = true);
 
     try {
-      await FirebaseFirestore.instance.collection('products').add({
-        'name': nameController.text,
-        'price': double.tryParse(priceController.text) ?? 0,
-        'description': descriptionController.text,
-        'imageUrl': imageUrlController.text,
-        'seller': FirebaseAuth.instance.currentUser?.uid ?? "unknown",
-        'searchName': nameController.text.toLowerCase(), // ✅ lowercase for search
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // Upload image
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('product_images')
+          .child("${DateTime.now().millisecondsSinceEpoch}.jpg");
+
+      await ref.putFile(_imageFile!);
+      final imageUrl = await ref.getDownloadURL();
+
+      // Save product data
+      await FirebaseFirestore.instance.collection("products").add({
+        'name': _name,
+        'description': _description,
+        'price': _price,
+        'imageUrl': imageUrl,
+        'sellerId': user.uid,
+        'seller': user.email ?? "Unknown Seller",
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Product added successfully")),
-      );
-
-      // Clear fields
-      nameController.clear();
-      priceController.clear();
-      descriptionController.clear();
-      imageUrlController.clear();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text("Product Added!")));
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Add Product")),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: "Product Name"),
-                validator: (value) =>
-                    value!.isEmpty ? "Enter product name" : null,
+      appBar: AppBar(title: const Text("Add Product"), backgroundColor: Colors.green.shade800),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  children: [
+                    TextFormField(
+                      decoration: const InputDecoration(labelText: "Product Name"),
+                      validator: (val) => val!.isEmpty ? "Enter name" : null,
+                      onSaved: (val) => _name = val!,
+                    ),
+                    TextFormField(
+                      decoration: const InputDecoration(labelText: "Description"),
+                      onSaved: (val) => _description = val!,
+                    ),
+                    TextFormField(
+                      decoration: const InputDecoration(labelText: "Price"),
+                      keyboardType: TextInputType.number,
+                      validator: (val) =>
+                          val!.isEmpty ? "Enter price" : null,
+                      onSaved: (val) => _price = double.parse(val!),
+                    ),
+                    const SizedBox(height: 12),
+                    _imageFile == null
+                        ? const Text("No image selected")
+                        : Image.file(_imageFile!, height: 150),
+                    ElevatedButton.icon(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.image),
+                      label: const Text("Pick Image"),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _saveProduct,
+                      child: const Text("Save Product"),
+                    ),
+                  ],
+                ),
               ),
-              TextFormField(
-                controller: priceController,
-                decoration: const InputDecoration(labelText: "Price"),
-                keyboardType: TextInputType.number,
-                validator: (value) =>
-                    value!.isEmpty ? "Enter product price" : null,
-              ),
-              TextFormField(
-                controller: descriptionController,
-                decoration: const InputDecoration(labelText: "Description"),
-                maxLines: 3,
-              ),
-              TextFormField(
-                controller: imageUrlController,
-                decoration: const InputDecoration(labelText: "Image URL"),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: isLoading ? null : _saveProduct,
-                child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Add Product"),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }

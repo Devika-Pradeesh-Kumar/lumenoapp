@@ -7,22 +7,62 @@ import 'package:lumeno_app/pages/profile_page.dart';
 import 'package:lumeno_app/pages/product_detail_page.dart';
 import 'package:lumeno_app/pages/cart_page.dart';
 import 'package:lumeno_app/pages/order_history_page.dart';
-import 'package:lumeno_app/pages/become_seller_page.dart';
+import 'package:lumeno_app/pages/search_page.dart';
+import 'package:lumeno_app/pages/hamper_page.dart';
 import 'package:lumeno_app/pages/seller_dashboard_page.dart';
-import 'package:lumeno_app/pages/search_page.dart'; 
-import 'package:lumeno_app/pages/hamper_page.dart'; // ✅ new import
+import 'package:lumeno_app/pages/seller_orders_page.dart';
+import 'package:lumeno_app/pages/seller_analytics_page.dart';
+import 'package:lumeno_app/pages/login_page.dart';
 
-
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
-  void signOut() {
-    FirebaseAuth.instance.signOut();
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  bool _isSeller = false;
+  bool _loading = true;
+  final user = FirebaseAuth.instance.currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSeller();
+  }
+
+  Future<void> _checkSeller() async {
+    if (user != null) {
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection('sellers')
+          .doc(user!.uid)
+          .get();
+
+      setState(() {
+        _isSeller = doc.exists;
+        _loading = false;
+      });
+    }
+  }
+
+  void signOut() async {
+    await FirebaseAuth.instance.signOut();
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -30,7 +70,6 @@ class HomePage extends StatelessWidget {
         title: const Text("LUMENO"),
         backgroundColor: Colors.green.shade200,
         actions: [
-          // ✅ SEARCH BUTTON FIX
           IconButton(
             onPressed: () {
               Navigator.push(
@@ -49,33 +88,28 @@ class HomePage extends StatelessWidget {
             },
             icon: const Icon(Icons.shopping_cart_outlined),
           ),
-          IconButton(onPressed: signOut, icon: const Icon(Icons.logout)),
+          IconButton(
+            onPressed: signOut,
+            icon: const Icon(Icons.logout),
+          ),
         ],
       ),
-
-      // ✅ Drawer remains same
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                color: Color.fromARGB(255, 23, 36, 24),
-              ),
-              child: const Text(
-                'LUMENO MENU',
-                style: TextStyle(color: Colors.white, fontSize: 24),
-              ),
+            const DrawerHeader(
+              decoration: BoxDecoration(color: Color.fromARGB(255, 23, 36, 24)),
+              child: Text('LUMENO MENU',
+                  style: TextStyle(color: Colors.white, fontSize: 24)),
             ),
             ListTile(
               leading: const Icon(Icons.person_outline),
               title: const Text('MY PROFILE'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ProfilePage()),
-                );
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (context) => const ProfilePage()));
               },
             ),
             ListTile(
@@ -84,63 +118,20 @@ class HomePage extends StatelessWidget {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const OrderHistoryPage()),
-                );
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const OrderHistoryPage()));
               },
             ),
             const Divider(),
-            StreamBuilder<DocumentSnapshot>(
-              stream: user != null
-                  ? FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(user.uid)
-                      .snapshots()
-                  : null,
-              builder: (context, snapshot) {
-                if (snapshot.hasData &&
-                    snapshot.data!.exists &&
-                    (snapshot.data!.data()
-                            as Map<String, dynamic>)['isSeller'] ==
-                        true) {
-                  return ListTile(
-                    leading: const Icon(Icons.dashboard_customize_outlined),
-                    title: const Text('Seller Dashboard'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) =>
-                                  const SellerDashboardPage()));
-                    },
-                  );
-                } else {
-                  return ListTile(
-                    leading: const Icon(Icons.storefront),
-                    title: const Text('Become a Seller'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) =>
-                                  const BecomeSellerPage()));
-                    },
-                  );
-                }
-              },
-            ),
           ],
         ),
       ),
-
-      // ✅ Body remains same, trending products updated
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Promo Banner
             Container(
               margin: const EdgeInsets.all(16.0),
               height: 320,
@@ -152,56 +143,113 @@ class HomePage extends StatelessWidget {
                 ),
               ),
             ),
+            // Categories
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0),
-              child: Text(
-                'SHOP BY CATEGORY',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
+              child: Text('SHOP BY CATEGORY',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
             SizedBox(
-  height: 100,
-  child: ListView(
-    scrollDirection: Axis.horizontal,
-    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-    children: [
-      GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const HamperPage()),
-          );
-        },
-        child: const CategoryIcon(icon: Icons.card_giftcard, label: 'Hamper'),
-      ),
-      const CategoryIcon(icon: Icons.brush, label: 'Handicrafts'),
-      const CategoryIcon(icon: Icons.checkroom, label: 'Clothing'),
-      const CategoryIcon(icon: Icons.eco, label: 'Organic'),
-      const CategoryIcon(icon: Icons.miscellaneous_services, label: 'Services'),
-    ],
-  ),
-),
+              height: 100,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(context,
+                          MaterialPageRoute(builder: (context) => const HamperPage()));
+                    },
+                    child: const CategoryIcon(icon: Icons.card_giftcard, label: 'Hamper'),
+                  ),
+                  const CategoryIcon(icon: Icons.brush, label: 'Handicrafts'),
+                  const CategoryIcon(icon: Icons.checkroom, label: 'Clothing'),
+                  const CategoryIcon(icon: Icons.eco, label: 'Organic'),
+                  const CategoryIcon(icon: Icons.miscellaneous_services, label: 'Services'),
+                ],
+              ),
+            ),
             const SizedBox(height: 24),
+
+            // Seller Mini Dashboard
+            if (_isSeller) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text('Seller Dashboard',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green.shade800)),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 120,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const SellerDashboardPage()),
+                        );
+                      },
+                      child: const SellerDashboardCard(icon: Icons.add_box, label: 'Add Product'),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const SellerDashboardPage()),
+                        );
+                      },
+                      child: const SellerDashboardCard(icon: Icons.list_alt, label: 'My Products'),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const SellerOrdersPage()),
+                        );
+                      },
+                      child: const SellerDashboardCard(icon: Icons.shopping_bag, label: 'Orders'),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const SellerAnalyticsPage()),
+                        );
+                      },
+                      child: const SellerDashboardCard(icon: Icons.analytics, label: 'Analytics'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // Trending Products
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'TRENDING PRODUCTS',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(onPressed: () {}, child: const Text('View All')),
+                children: const [
+                  Text('TRENDING PRODUCTS',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text('View All'),
                 ],
               ),
             ),
             const SizedBox(height: 12),
             StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('products')
-                  .limit(8)
-                  .snapshots(),
+              stream: FirebaseFirestore.instance.collection('products').limit(8).snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -215,18 +263,39 @@ class HomePage extends StatelessWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
+                    crossAxisCount: 2,
                     crossAxisSpacing: 16.0,
                     mainAxisSpacing: 16.0,
-                    childAspectRatio: 1.2,
+                    childAspectRatio: 0.75,
                   ),
                   itemCount: products.length,
                   itemBuilder: (context, index) {
-                    final productData =
-                        products[index].data() as Map<String, dynamic>;
+                    final productData = products[index].data() as Map<String, dynamic>;
                     final productId = products[index].id;
+
                     return ProductCard(
-                        product: productData, productId: productId);
+                      product: productData,
+                      productId: productId,
+                      addToCart: () async {
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user != null) {
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(user.uid)
+                              .collection('cart')
+                              .doc(productId)
+                              .set({
+                            'name': productData['name'],
+                            'price': productData['price'],
+                            'imageUrl': productData['imageUrl'],
+                            'quantity': 1,
+                          }, SetOptions(merge: true));
+
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(const SnackBar(content: Text('Added to cart')));
+                        }
+                      },
+                    );
                   },
                 );
               },
@@ -239,11 +308,12 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// ✅ Category Icon
+// Category Icon Widget
 class CategoryIcon extends StatelessWidget {
   final IconData icon;
   final String label;
   const CategoryIcon({super.key, required this.icon, required this.label});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -258,24 +328,56 @@ class CategoryIcon extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(label,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
+              textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
         ],
       ),
     );
   }
 }
 
-// ✅ Product Card with Firestore Add-to-Cart
+// Seller Mini Dashboard Card
+class SellerDashboardCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const SellerDashboardCard({super.key, required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 120,
+      margin: const EdgeInsets.only(right: 12),
+      decoration: BoxDecoration(
+        color: Colors.green.shade100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 36, color: Colors.green.shade800),
+          const SizedBox(height: 8),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, color: Colors.green.shade900)),
+        ],
+      ),
+    );
+  }
+}
+
+// Product Card Widget
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   final String productId;
+  final VoidCallback addToCart;
+
   const ProductCard({
     super.key,
     required this.product,
     required this.productId,
+    required this.addToCart,
   });
+
   @override
   Widget build(BuildContext context) {
     final String imageUrl = product['imageUrl'] ?? '';
@@ -283,15 +385,14 @@ class ProductCard extends StatelessWidget {
     final String seller = product['seller'] ?? 'Local Artisan';
     final num price = product['price'] ?? 0;
     final double rating = (product['rating'] ?? 4.5).toDouble();
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                ProductDetailPage(product: product, productId: productId),
-          ),
-        );
+            context,
+            MaterialPageRoute(
+                builder: (context) =>
+                    ProductDetailPage(product: product, productId: productId)));
       },
       child: Container(
         decoration: BoxDecoration(
@@ -299,10 +400,7 @@ class ProductCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(15.0),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 2,
-              blurRadius: 5,
-            ),
+                color: Colors.grey.withOpacity(0.2), spreadRadius: 2, blurRadius: 5)
           ],
         ),
         child: Column(
@@ -313,13 +411,9 @@ class ProductCard extends StatelessWidget {
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(15.0)),
-                      image: DecorationImage(
-                        image: NetworkImage(imageUrl),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+                        borderRadius:
+                            const BorderRadius.vertical(top: Radius.circular(15.0)),
+                        image: DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)),
                   ),
                   Positioned(
                     top: 8,
@@ -329,8 +423,7 @@ class ProductCard extends StatelessWidget {
                       radius: 15,
                       child: IconButton(
                         iconSize: 15,
-                        icon: const Icon(Icons.favorite_border,
-                            color: Colors.grey),
+                        icon: const Icon(Icons.favorite_border, color: Colors.grey),
                         onPressed: () {},
                       ),
                     ),
@@ -351,64 +444,31 @@ class ProductCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text(name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
-                  Text(
-                    'By $seller',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text('By $seller',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '₹${price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                        ),
-                      ),
+                      Text('₹${price.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       ElevatedButton(
-                        onPressed: () async {
-                          final user = FirebaseAuth.instance.currentUser;
-                          if (user != null) {
-                            await FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(user.uid)
-                                .collection('cart')
-                                .doc(productId)
-                                .set({
-                              'name': name,
-                              'price': price,
-                              'imageUrl': imageUrl,
-                              'quantity': 1,
-                            }, SetOptions(merge: true));
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Added to cart')),
-                            );
-                          }
-                        },
+                        onPressed: addToCart,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              const Color.fromARGB(255, 236, 230, 230),
+                          backgroundColor: const Color.fromARGB(255, 236, 230, 230),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                         ),
-                        child:
-                            const Text('ADD', style: TextStyle(fontSize: 14)),
+                        child: const Text('ADD', style: TextStyle(fontSize: 14)),
                       ),
                     ],
                   ),
