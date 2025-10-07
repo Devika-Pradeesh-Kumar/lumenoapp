@@ -1,5 +1,7 @@
 // lib/pages/add_edit_product_page.dart
 
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -26,9 +28,10 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
   final _stockController = TextEditingController(); // New field for stock
 
   String? _imageUrl;
-  File? _imageFile;
+  XFile? _pickedFile; // To store the picked image file
+  Uint8List? _pickedImageBytes; // To store bytes for web preview
   bool _isLoading = false;
-  bool _isEditing = false; // To distinguish between add and edit mode
+  bool _isEditing = false;
 
   @override
   void initState() {
@@ -39,7 +42,7 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
       _descriptionController.text = widget.product!['description'] ?? '';
       _priceController.text = (widget.product!['price'] ?? 0.0).toString();
       _categoryController.text = widget.product!['category'] ?? '';
-      _stockController.text = (widget.product!['stock'] ?? 0).toString(); // Initialize stock
+      _stockController.text = (widget.product!['stock'] ?? 0).toString();
       _imageUrl = widget.product!['imageUrl'];
     }
   }
@@ -60,13 +63,20 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
 
     if (image != null) {
       setState(() {
-        _imageFile = File(image.path);
+        _pickedFile = image;
+        if (kIsWeb) {
+          image.readAsBytes().then((bytes) {
+            setState(() {
+              _pickedImageBytes = bytes;
+            });
+          });
+        }
       });
     }
   }
 
   Future<String?> _uploadImage() async {
-    if (_imageFile == null) {
+    if (_pickedFile == null) {
       return _imageUrl; // If no new image picked, return existing URL
     }
 
@@ -81,8 +91,17 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
     try {
       final fileName = '${currentUser.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final storageRef = FirebaseStorage.instance.ref().child('product_images').child(fileName);
-      await storageRef.putFile(_imageFile!);
-      return await storageRef.getDownloadURL();
+
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        final Uint8List imageData = await _pickedFile!.readAsBytes();
+        uploadTask = storageRef.putData(imageData);
+      } else {
+        uploadTask = storageRef.putFile(File(_pickedFile!.path));
+      }
+
+      final TaskSnapshot snapshot = await uploadTask;
+      return await snapshot.ref.getDownloadURL();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error uploading image: $e')),
@@ -110,10 +129,13 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
 
     try {
       final imageUrl = await _uploadImage();
-      if (_imageFile != null && imageUrl == null) {
+      if (_pickedFile != null && imageUrl == null) {
         // If an image was picked but failed to upload
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image upload failed. Product was not saved.')),
+        );
         setState(() { _isLoading = false; });
-        return;
+        return; // Stop execution
       }
 
       final productData = {
@@ -121,15 +143,13 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
         'description': _descriptionController.text.trim(),
         'price': double.tryParse(_priceController.text.trim()) ?? 0.0,
         'category': _categoryController.text.trim(),
-        'stock': int.tryParse(_stockController.text.trim()) ?? 0, // Save stock
-        'imageUrl': imageUrl,
-        'sellerId': currentUser.uid, // Tie product to seller
-        'sellerName': currentUser.displayName ?? currentUser.email, // Store seller's name/email
-        'timestamp': FieldValue.serverTimestamp(), // Useful for sorting/tracking
-        // For geolocation: Add dummy values for now, you'll update this
-        'latitude': 37.7749, // Example: San Francisco lat
-        'longitude': -122.4194, // Example: San Francisco lon
-        // Real implementation would capture seller's actual location for the product
+        'stock': int.tryParse(_stockController.text.trim()) ?? 0,
+        'imageUrl': imageUrl ?? '', // Use the URL, or an empty string if it's null
+        'sellerId': currentUser.uid,
+        'sellerName': currentUser.displayName ?? currentUser.email,
+        'timestamp': FieldValue.serverTimestamp(),
+        'latitude': 37.7749,
+        'longitude': -122.4194,
       };
 
       if (_isEditing) {
@@ -143,15 +163,19 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
           const SnackBar(content: Text('Product added successfully!')),
         );
       }
-      Navigator.of(context).pop(); // Go back to SellerProductsPage
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to save product: $e')),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -171,24 +195,24 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    // Product Image Picker
                     GestureDetector(
                       onTap: _pickImage,
                       child: CircleAvatar(
                         radius: 60,
                         backgroundColor: Colors.grey.shade200,
-                        backgroundImage: _imageFile != null
-                            ? FileImage(_imageFile!)
-                            : (_imageUrl != null && _imageUrl!.isNotEmpty
-                                ? NetworkImage(_imageUrl!) as ImageProvider
-                                : null),
-                        child: _imageFile == null && (_imageUrl == null || _imageUrl!.isEmpty)
+                        backgroundImage: _pickedImageBytes != null
+                            ? MemoryImage(_pickedImageBytes!)
+                            : (_pickedFile != null && !kIsWeb
+                                ? FileImage(File(_pickedFile!.path))
+                                : (_imageUrl != null && _imageUrl!.isNotEmpty
+                                    ? NetworkImage(_imageUrl!)
+                                    : null)) as ImageProvider?,
+                        child: _pickedFile == null && (_imageUrl == null || _imageUrl!.isEmpty)
                             ? Icon(Icons.add_a_photo, size: 40, color: Colors.grey.shade600)
                             : null,
                       ),
                     ),
                     const SizedBox(height: 20),
-                    // Product Name
                     TextFormField(
                       controller: _nameController,
                       decoration: const InputDecoration(
@@ -203,7 +227,6 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
                       },
                     ),
                     const SizedBox(height: 15),
-                    // Product Description
                     TextFormField(
                       controller: _descriptionController,
                       decoration: const InputDecoration(
@@ -219,7 +242,6 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
                       },
                     ),
                     const SizedBox(height: 15),
-                    // Product Price
                     TextFormField(
                       controller: _priceController,
                       decoration: const InputDecoration(
@@ -238,7 +260,6 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
                       },
                     ),
                     const SizedBox(height: 15),
-                    // Product Category
                     TextFormField(
                       controller: _categoryController,
                       decoration: const InputDecoration(
@@ -253,7 +274,6 @@ class _AddEditProductPageState extends State<AddEditProductPage> {
                       },
                     ),
                      const SizedBox(height: 15),
-                    // Product Stock
                     TextFormField(
                       controller: _stockController,
                       decoration: const InputDecoration(
